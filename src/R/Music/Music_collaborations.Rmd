@@ -1,0 +1,228 @@
+---
+title: "Music"
+output: 
+  flexdashboard::flex_dashboard:
+    logo: ~/Documents/logos/npr_logo2.png
+    orientation: rows
+    vertical_layout: fill
+    theme: bootstrap
+---
+
+
+
+```{css}
+
+
+.navbar-inverse {
+  background-image: url(http://analytics.npr.org/dashboards/background_pic);
+ 
+  filter: grayscale(30%);
+  filter: opacity(80%);
+ 
+  background-repeat: no-repeat;
+  padding: 3px
+  
+}
+
+
+.navbar-brand {
+color:white!important;
+font-size:15pt;
+font-weight: 310; 
+
+font-family: 'Helvetica Neue', sans-serif;
+ margin: 8px 200px 8px 46px;
+ 
+ 
+}
+.navbar-title {
+  color: #ffffff; font-family: 'Lato', sans-serif; font-size: 54px; font-weight: 300; line-height: 58px; margin: 10px; padding: 10px; }
+
+p { font-family: 'Helvetica Neue', sans-serif;  color: #777777; margin: 2px 15px 2px 15px; font-weight: 260; }
+
+.navbar-inverse .navbar-text {
+  color: #ffffff;
+}
+
+
+.navbar-inverse .navbar-nav > li > a {
+  color: #ffffff;
+  font-weight: 310; 
+
+font-family: 'Helvetica Neue', sans-serif;
+}
+
+
+.level1 { margin-top: 10px; margin-bottom: 12px}
+
+.footer {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    
+   
+    text-align: right;
+}
+
+
+```	
+<div class="footer">
+  <p> mhughes@npr.org |  Updated  <script> document.write(new Date().toLocaleDateString()); </script> </p>
+</div>
+
+
+<style type="text/css">
+h4.date {
+  text-align: right;
+}
+</style>
+
+ 
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+
+
+
+library(readr)
+library(tidyverse)
+library(lubridate)
+library(stringr)
+library(ggplot2)
+library(highcharter)
+
+
+# Clean -------------------------------------------------------------------
+
+
+us_billboard <- read_delim("../../Python/us_billboard.psv",delim="|", col_names = FALSE)
+colnames(us_billboard)<-c("pos" ,"last.week", "peak" ,"weeks.on.chart" , "title","artist", "chart.entry.date", "entry.position", "overall.peak", "overall.weeks.on.chart", "chart.date")
+us_billboard$chart.entry.date<-as.Date(us_billboard$chart.entry.date)
+
+
+us_billboard$chart.date<- paste0(substr(us_billboard$chart.date,1,4),"-",substr(us_billboard$chart.date,5,6),"-",substr(us_billboard$chart.date,7,8))
+us_billboard$chart.date<-as.Date(us_billboard$chart.date)
+
+us_billboard$year<-year(us_billboard$chart.date)
+us_billboard$year[is.na(us_billboard$year)]<-2000
+us_billboard$artist<-as.character(us_billboard$artist)
+patterns<-c("featuring", "&", "with","and", "/",",")
+
+us_billboard$collab <- ifelse(grepl(paste(patterns, collapse = "|"), us_billboard$artist), "Collaboration","Solo")
+
+
+# Collab ------------------------------------------------------------------
+
+
+
+collab <- us_billboard %>%
+    filter(collab == "Collaboration")
+yearly <- collab %>%
+    group_by(year) %>%
+    summarise(tot=n())
+yearly$year[is.na(yearly$year)]<-2000
+yearly<-yearly  %>% filter(year!=2018)
+
+```
+
+
+Column  {.tabset}
+-----------------------------------------------------------------------
+
+### Yearly Collaborations (Top 100)
+```{r,include=FALSE}
+#hc<- 
+    highchart() %>% hc_chart(type = "column") %>% hc_add_series(data=yearly$tot, name="Number of Collaborations") %>% 
+    hc_xAxis(data=year(as.Date.character(yearly$year,"%Y")) ) %>%
+#hc %>%  hc_chart(type = "column")%>%
+    hc_title(text="Yearly Total Collaborations on Billboard Hot 100") # %>% 
+ #   hc_add_series(type="",data=yearly$tot )
+
+
+#highchart() %>% hc_add_series(data=yearly, "scatter", hcaes(x=year,y=tot), name="Number of Collaborations") %>% hc_title(text="Yearly Total Collaborations on Billboard Hot 100")
+
+```
+
+
+
+```{r}
+
+#hchart(yearly, hcaes(x=year,y=tot)) %>% hc_title(text="Yearly Total Collaborations on Billboard Hot 100")
+highchart() %>% hc_add_series(data=yearly,type="column",  hcaes(x=year,y=tot),name="Number of Collaborations") %>% hc_add_series(data=yearly, "scatter", hcaes(x=year,y=tot), name="", showInLegend=FALSE, visible=FALSE, labels=FALSE) %>% hc_title(text="Yearly Total Collaborations on Billboard Hot 100")
+```
+
+
+
+
+
+### Collaborations vs Solo (Top 100)
+```{r}
+yearly_all <- us_billboard %>%
+    group_by(year,collab) %>%
+    summarize(tot=n()) 
+yearly_all$year[is.na(yearly_all$year)]<-2000
+yearly_all<-yearly_all %>% filter(year!=2018)
+
+highchart() %>% #hc_add_series(data=yearly, "scatter", hcaes(x=year,y=tot), name="", showInLegend=FALSE, visible=FALSE, labels=FALSE) %>% 
+    hc_title(text="Yearly Total Collaborations on Billboard Hot 100")%>% hc_add_series(data=yearly_all,type="column",  hcaes(x=year,y=tot,group=collab),color=c("slategray","lightgray")) %>% hc_plotOptions(column=list(stacking="normal"))
+
+
+```
+
+### Collaborations vs Solo % (Top 100)
+```{r}
+
+
+highchart() %>% #hc_add_series(data=yearly, "scatter", hcaes(x=year,y=tot), name="", showInLegend=FALSE, visible=FALSE, labels=FALSE) %>% 
+    hc_title(text="Yearly % of Collaborations on Billboard Hot 100")%>% hc_add_series(data=yearly_all,type="column",  hcaes(x=year,y=tot,group=collab), color=c("slategray","lightgray")) %>% hc_plotOptions(column=list(stacking="percent"))
+
+```
+
+### Yearly Hiphop Collaborations
+
+```{r}
+us_billboard_genre<-read_csv( "~/Documents/2018/06_Music/DATA/CLEANED/us_billboard_with_genre.csv")
+yearly_all_genre <- us_billboard_genre %>%
+    group_by(year,collab,genre) %>%
+    summarize(tot=n()) 
+yearly_all_genre$year[is.na(yearly_all_genre$year)]<-2000
+yearly_all_genre<-yearly_all_genre %>% filter(year!=2018)
+
+
+us_billboard_hiphop<- yearly_all_genre %>% filter(genre=="Hiphop") 
+us_billboard_other<- yearly_all_genre %>% filter(genre!="Hiphop") 
+
+
+
+highchart() %>% #hc_add_series(data=yearly, "scatter", hcaes(x=year,y=tot), name="", showInLegend=FALSE, visible=FALSE, labels=FALSE) %>% 
+    hc_title(text="Yearly % of Collaborations on Billboard Hot 100")%>% hc_add_series(data=us_billboard_other,type="column",  hcaes(x=year,y=tot,group=collab), stack="Other", color=c("slategray","lightgray"), name="Other")  %>%hc_add_series(data=us_billboard_hiphop,type="column",  hcaes(x=year,y=tot,group=collab),stack="Hiphop",color=c("slateblue","lightblue"), name="Hiphop") %>%
+
+hc_plotOptions(series=list(stacking="normal")) %>% hc_chart(zoomType='x')
+```
+
+
+### Hiphop vs Other (Avg Week)
+
+```{r}
+us_billboard_genre$year[is.na(us_billboard_genre$year)]<-2000
+weekly_all_genre <- us_billboard_genre %>% group_by(chart.date) %>% mutate(num_records=n()) %>% ungroup() %>%
+    group_by(year,chart.date,collab,genre,num_records) %>%
+    summarize(tot=n(), frac_100=tot/unique(num_records)) %>% filter(chart.date>="1955-11-02") %>% ungroup() 
+
+avg_weekly_all_genre= weekly_all_genre %>% group_by(year,collab,genre) %>%
+    summarize(avg_weekly_frac=round(100*mean(frac_100)))
+
+
+
+us_billboard_hiphop<- avg_weekly_all_genre %>% filter(genre=="Hiphop") 
+us_billboard_other<- avg_weekly_all_genre %>% filter(genre!="Hiphop") 
+
+
+
+highchart() %>% #hc_add_series(data=yearly, "scatter", hcaes(x=year,y=tot), name="", showInLegend=FALSE, visible=FALSE, labels=FALSE) %>% 
+    hc_title(text="Billboard Hot 100, Average Weekly Breakdown [Hiphop in blue]")%>% hc_add_series(data=us_billboard_hiphop,type="column",  hcaes(x=year,y=avg_weekly_frac,group=collab),stack="Hiphop",color=c("slateblue","lightblue")) %>%
+    hc_add_series(data=us_billboard_other,type="column",  hcaes(x=year,y=avg_weekly_frac,group=collab), stack="Other", color=c("slategray","lightgray"))  %>% 
+
+hc_plotOptions(series=list(stacking="normal")) %>% hc_chart(zoomType='x')
+```
